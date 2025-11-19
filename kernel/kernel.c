@@ -1,17 +1,19 @@
 // kernel/kernel.c
-// PurpleHaxOS kernel C entrypoint with Multiboot2 memory parsing.
+// PurpleHaxOS kernel C entrypoint with Multiboot2 memory parsing + IDT init.
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include "console.h"
 #include "panic.h"
+#include "idt.h"
 
 // ---------------------------------------------------------------------------
 // Multiboot2 structures
 // ---------------------------------------------------------------------------
 
-#define MULTIBOOT2_TAG_TYPE_END   0
-#define MULTIBOOT2_TAG_TYPE_MMAP  6
+#define MULTIBOOT2_TAG_TYPE_END    0
+#define MULTIBOOT2_TAG_TYPE_MMAP   6
 #define MULTIBOOT2_MMAP_TYPE_AVAILABLE 1
 
 struct multiboot_tag {
@@ -43,10 +45,12 @@ void kernel_main(uint64_t mb_info_addr) {
         panic("mb_info_addr == 0 (no Multiboot2 info)");
     }
 
+    // Initialize IDT so CPU exceptions have somewhere to go
+    idt_init();
+
     uint8_t* mb = (uint8_t*)(uintptr_t)mb_info_addr;
     uint32_t total_size = *(uint32_t*)mb;     // total size of multiboot info
-    (void)total_size;
-
+    (void)total_size; // not used yet
     uint8_t* tag_ptr = mb + 8;               // skip total_size + reserved
 
     uint64_t total_usable_bytes = 0;
@@ -77,7 +81,7 @@ void kernel_main(uint64_t mb_info_addr) {
         }
 
         // tags are 8-byte aligned
-        tag_ptr += (tag->size + 7) & ~7U;
+        tag_ptr += (tag->size + 7U) & ~7U;
     }
 
     uint64_t total_usable_mib = total_usable_bytes >> 20; // / (1024*1024)
