@@ -4,17 +4,20 @@ ENTRY(_start)
 
 SECTIONS
 {
-    /*GRUB will load us around here */
     . = 1M;
 
-    .text ALIGN(4K) : 
+    .text ALIGN(4K) :
     {
-        /* Multiboot2 header must be early in the binary */
         *(.multiboot_header)
-        *(.text*)
+        *(.text)
     }
 
-    .rodata ALIGN(4K) : 
+    .text64 ALIGN(4K) :
+    {
+        *(.text64)
+    }
+
+    .rodata ALIGN(4K) :
     {
         *(.rodata*)
     }
@@ -24,7 +27,7 @@ SECTIONS
         *(.data*)
     }
 
-    .bss ALIGN(4K) : 
+    .bss ALIGN(4K) :
     {
         *(COMMON)
         *(.bss*)
