@@ -17,9 +17,9 @@ PTE_PRESENT    equ 1 << 0      ; entry is valid
 PTE_RW         equ 1 << 1      ; writable
 PTE_PS         equ 1 << 7      ; large page (2 MiB)
 
-; -----------------------------------------------------------------------------
+; =============================================================================
 ; Multiboot2 header
-; -----------------------------------------------------------------------------
+; =============================================================================
 
 SECTION .multiboot_header
 align 8
@@ -35,9 +35,9 @@ multiboot_header_start:
     dd 8                                  ; size
 multiboot_header_end:
 
-; -----------------------------------------------------------------------------
+; =============================================================================
 ; GDT (32-bit + 64-bit descriptors)
-; -----------------------------------------------------------------------------
+; =============================================================================
 
 section .data
 align 8
@@ -64,11 +64,11 @@ gdt64_end:
 
 gdt64_descriptor:
     dw gdt64_end - gdt64 - 1     ; size
-    dd gdt64                     ; base (32-bit; OK in 32-bit mode)
+    dd gdt64                     ; base (32-bit; fine in 32-bit mode)
 
-; -----------------------------------------------------------------------------
-; Paging structures (.bss) – PML4 / PDPT / PD
-; -----------------------------------------------------------------------------
+; =============================================================================
+; Paging structures + stack (.bss)
+; =============================================================================
 
 section .bss
 align 4096
@@ -80,11 +80,16 @@ pdpt:
     resq 512          ; PDPT = 512 entries
 
 pd:
-    resq 512          ; Page Directory = 512 entries (will use 2 MiB page)
+    resq 512          ; Page Directory = 512 entries (we'll use 2 MiB page)
 
-; -----------------------------------------------------------------------------
+align 16
+stack_bottom:
+    resb 4096 * 4     ; 16 KiB stack
+stack_top:
+
+; =============================================================================
 ; 32-bit code
-; -----------------------------------------------------------------------------
+; =============================================================================
 
 section .text
 global _start
@@ -175,34 +180,25 @@ _start:
     ; Now jump into 64-bit long mode code segment
     jmp GDT64_CODE64_SEL:long_mode_entry
 
-; -----------------------------------------------------------------------------
+; =============================================================================
 ; 64-bit long mode code
-; -----------------------------------------------------------------------------
+; =============================================================================
 
 section .text64
 align 16
 BITS 64
+extern kernel_main
 global long_mode_entry
 
 long_mode_entry:
-    ; Simple 64-bit VGA text output at top-left
-    mov rdi, 0xB8000                  ; VGA text memory
-    mov rsi, msg64                    ; message
-    mov ah, 0x05                      ; purple on black
+    ; Set up a 16-byte aligned stack for C (SysV ABI)
+    mov     rsp, stack_top
+    sub     rsp, 8              ; align so (RSP+8) % 16 == 0 before CALL
 
-.print_loop:
-    lodsb                             ; AL = [RSI], RSI++
-    cmp al, 0
-    je .done
-    mov [rdi], al
-    mov [rdi + 1], ah
-    add rdi, 2
-    jmp .print_loop
+    ; Call the C kernel entry point
+    call    kernel_main
 
-.done:
 .hang64:
     hlt
     jmp .hang64
-
-msg64: db "PurpleHaxOS: 64-bit long mode online", 0
 

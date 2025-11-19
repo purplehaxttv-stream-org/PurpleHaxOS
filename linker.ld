@@ -1,13 +1,15 @@
-/* linker.ld  - Linker script for Multiboot , loaded at 1 MiB */
+/* linker.ld  - Linker script for 64-bit kernel, loaded at 1 MiB */
 
 ENTRY(_start)
 
 SECTIONS
 {
+    /* GRUB will load us around here */
     . = 1M;
 
     .text ALIGN(4K) :
     {
+        /* Multiboot2 header must be early in the binary */
         *(.multiboot_header)
         *(.text)
     }
