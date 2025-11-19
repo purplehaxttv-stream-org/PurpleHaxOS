@@ -36,14 +36,17 @@ multiboot_header_start:
 multiboot_header_end:
 
 ; =============================================================================
-; GDT (32-bit + 64-bit descriptors)
+; GDT, Multiboot info pointer, etc.
 ; =============================================================================
 
 section .data
 align 8
 
+mb_info_ptr:
+    dd 0                      ; will hold 32-bit Multiboot2 info address from EBX
+
 gdt64:
-    dq 0                     ; NULL descriptor
+    dq 0                      ; NULL descriptor
 
 gdt64_code:
     ; 32-bit kernel code descriptor
@@ -165,10 +168,10 @@ enable_paging:
 ; -----------------------------------------------------------------------------
 
 _start:
-    ; GRUB gave us:
-    ;  - 32-bit protected mode
-    ;  - A20 enabled
-    ;  - paging disabled
+    ; On entry from Multiboot2:
+    ;  EAX = magic
+    ;  EBX = pointer to multiboot2 info structure
+    mov [mb_info_ptr], ebx     ; save multiboot info pointer
 
     cli                         ; Disable interrupts
     call load_gdt               ; Install and use our GDT
@@ -194,6 +197,10 @@ long_mode_entry:
     ; Set up a 16-byte aligned stack for C (SysV ABI)
     mov     rsp, stack_top
     sub     rsp, 8              ; align so (RSP+8) % 16 == 0 before CALL
+
+    ; Load Multiboot2 info pointer (saved as 32-bit) and zero-extend to 64-bit
+    mov     eax, [mb_info_ptr]
+    mov     rdi, rax            ; 1st arg to kernel_main: mb_info_addr (uint64_t)
 
     ; Call the C kernel entry point
     call    kernel_main
